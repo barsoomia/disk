@@ -8,40 +8,39 @@ import (
 )
 
 var (
-	flags                                   *flag.FlagSet
-	flagHelp, flagCreate, flagUpdate        *bool
-	flagAddpart, flagDelpart, flagStartsect *int
-	flagBootcode, flagLastsect              *string
+	flags                       *flag.FlagSet
+	help, create, update        *bool
+	addPart, delPart, startSect *int
+	bootcode, lastSect          *string
 )
 
 func init() {
 	flags = flag.NewFlagSet("mbr", flag.ContinueOnError)
-	flagHelp = flags.Bool("help", false, "Show this help")
-	flagCreate = flags.Bool("create", false, "Create new MBR")
-	flagUpdate = flags.Bool("update", false, "Update MBR")
-	flagAddpart = flag.Int("add-part", 0, "Add partition")
-	flagDelpart = flag.Int("del-part", 0, "Delete partition")
-	flagStartsect = flag.Int("start-sect", 0, "start sector")
-	flagLastsect = flag.String("last-sect", "", "last sector (modififers +K, +M, +G works)")
-	flagBootcode = flags.String("bootcode", "", "Bootsector binary code")
+	help = flags.Bool("help", false, "Show this help")
+	create = flags.Bool("create", false, "Create new MBR")
+	update = flags.Bool("update", false, "Update MBR")
+	addPart = flag.Int("add-part", 0, "Add partition")
+	delPart = flag.Int("del-part", 0, "Delete partition")
+	startSect = flag.Int("start-sect", 0, "start sector")
+	lastSect = flag.String("last-sect", "", "last sector (modififers +K, +M, +G works)")
+	bootcode = flags.String("bootcode", "", "Bootsector binary code")
 }
 
-func addPart(disk string, partnumber int, startsect int, lastsect string) error {
+func addPartition(disk string, partn int, startsect int, lastsect string) error {
 	mbrdata, err := mbr.FromFile(disk)
-
 	if err != nil {
 		return err
 	}
 
 	p := mbr.NewEmptyPartition()
-	mbrdata.SetPart(partnumber, p)
+	mbrdata.SetPart(partn, p)
 	return nil
 }
 
 func MBR(args []string) error {
 	flags.Parse(args[1:])
 
-	if *flagHelp {
+	if *help {
 		flags.PrintDefaults()
 		return nil
 	}
@@ -51,31 +50,29 @@ func MBR(args []string) error {
 		return fmt.Errorf("Require one device file")
 	}
 
-	if *flagCreate {
-		if *flagUpdate {
+	if *create {
+		if *update {
 			return fmt.Errorf("-create conflicts with -update")
 		}
 
-		return mbr.Create(disks[0], *flagBootcode)
+		return mbr.Create(disks[0], *bootcode)
 	}
 
-	if *flagUpdate {
-		if *flagAddpart <= 0 || *flagDelpart == 0 {
+	if *update {
+		if *addPart <= 0 || *delPart == 0 {
 			return fmt.Errorf("-update requires flag -add-part or --del-part")
 		}
 
-		if *flagAddpart != 0 {
-			partNumber := *flagAddpart
-
-			if *flagStartsect == -1 {
+		if *addPart != 0 {
+			partn := *addPart
+			if *startSect == -1 {
 				return fmt.Errorf("-add-part requires -start-sect")
 			}
 
-			if *flagLastsect == "" {
+			if *lastSect == "" {
 				return fmt.Errorf("-add-part requires -last-sect")
 			}
-
-			return addPart(disks[0], partNumber, *flagStartsect, *flagLastsect)
+			return addPartition(disks[0], partn, *startSect, *lastSect)
 		}
 
 		return fmt.Errorf("-del-part not implemented")
@@ -83,7 +80,6 @@ func MBR(args []string) error {
 
 	for _, disk := range disks {
 		err := mbr.Info(disk)
-
 		if err != nil {
 			return err
 		}
